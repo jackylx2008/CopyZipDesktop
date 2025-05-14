@@ -13,3 +13,5 @@ Latex 安装教程
 3. 运行 install-tl-windows.bat 进行安装
 4. 验证是否安装成功
 5. 安装开发工具
+
+## combine_pdf.py only work in windows system
