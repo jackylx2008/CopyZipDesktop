@@ -236,4 +236,6 @@ if __name__ == "__main__":
     if is_B25B26 == "Yes":
         config = read_config("./path_config_B25B26.yaml")
     validate_docx_pdf_pairs(config)
-    merge_docx_pdf(config)
+    merge_docx_pdf(
+        config, output_path=config.get("desktop_output", "") + "/final_merged.pdf"
+    )
