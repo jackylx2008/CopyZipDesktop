@@ -22,20 +22,19 @@ import yaml
 from PyPDF2 import PdfMerger
 
 # ========== 可选依赖：Windows Word COM ==========
-_has_pywin32 = False
+_HAS_PYWIN32 = False
 try:
     import win32com.client
     import pythoncom
     import win32api  # 用于验证安装
 
     # 验证 pywin32 是否正确安装
-    _has_pywin32 = win32api.GetSystemMetrics(0) > 0  # 简单的验证调用
-    if _has_pywin32:
-        com_error = win32com.client.pywintypes.com_error
+    _HAS_PYWIN32 = win32api.GetSystemMetrics(0) > 0  # 简单的验证调用
+    if _HAS_PYWIN32:
+        COM_ERROR = win32com.client.pywintypes.com_error
 except ImportError:
-    win32com = None
     pythoncom = None
-    com_error = Exception
+    COM_ERROR = Exception
 
 # ========== 可选依赖：reprint_to_a4 使用 ==========
 # 我们在函数里会再次做兜底检查并给出清晰错误
@@ -76,6 +75,9 @@ if sys.platform.startswith("win"):
 def setup_logger(
     name: str = __name__, log_level=logging.INFO, log_file: str | None = None
 ) -> logging.Logger:
+    """
+    设置并返回一个日志记录器
+    """
     logger_instance = logging.getLogger(name)
     if not logger_instance.hasHandlers():
         logger_instance.setLevel(log_level)
@@ -95,8 +97,9 @@ def setup_logger(
 
         if log_file:
             Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+            max_bytes = 5 * 1024 * 1024  # 5MB
             fh = RotatingFileHandler(
-                log_file, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+                log_file, maxBytes=max_bytes, backupCount=3, encoding="utf-8"
             )
             fh.setFormatter(fmt)
             logger_instance.addHandler(fh)
@@ -109,6 +112,9 @@ logger = setup_logger(log_file="./logs/combine_pdf.log")
 
 # ---------- 读取配置 ----------
 def read_config(config_path="./path_config.yaml") -> dict:
+    """
+    读取 YAML 配置文件
+    """
     logger.info("读取配置文件: %s", config_path)
     with open(config_path, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
@@ -195,7 +201,7 @@ def convert_docx_to_pdf(docx_path: Path, output_pdf_path: Path):
     """使用 Microsoft Word COM 转换（仅 Windows 可用）"""
     if not sys.platform.startswith("win"):
         raise RuntimeError("此功能仅支持 Windows 系统")
-    if not _has_pywin32:
+    if not _HAS_PYWIN32:
         raise RuntimeError(
             "未能正确初始化 pywin32。请尝试以下步骤：\n"
             "1. 确保已安装: pip install --upgrade pywin32\n"
@@ -213,25 +219,25 @@ def convert_docx_to_pdf(docx_path: Path, output_pdf_path: Path):
         except Exception as e:
             raise RuntimeError(
                 f"无法启动 Word: {e}。请确保 Microsoft Word 已正确安装。"
-            )
+            ) from e
         word.DisplayAlerts = 0
         logger.info("打开 Word 文档: %s", docx_path)
         doc = word.Documents.Open(str(docx_path))
         # 17 = wdFormatPDF
         doc.SaveAs(str(output_pdf_path), FileFormat=17)
-    except (AttributeError, com_error) as e:
+    except (AttributeError, COM_ERROR) as e:
         logger.exception("使用 Word 将 %s 转为 PDF 失败: %s", docx_path, str(e))
         raise
     finally:
         try:
             if doc is not None:
                 doc.Close(False)
-        except (AttributeError, com_error):
+        except (AttributeError, COM_ERROR):
             pass
         try:
             if word is not None:
                 word.Quit()
-        except (AttributeError, com_error):
+        except (AttributeError, COM_ERROR):
             pass
         # 清理 COM
         pythoncom.CoUninitialize()
@@ -283,9 +289,9 @@ def merge_docx_pdf(cfg_dict: dict, output_path: Path):
                     merger.append(str(tmp_docx_pdf))
                     merger.append(str(pdf_file))
                     appended_count += 2
-                    logger.info("✅ 添加合并项: %s + %s", docx.name, pdf_file.name)
+                    logger.info("✅添加合并项: %s + %s", docx.name, pdf_file.name)
                 except (IOError, ValueError) as e:
-                    logger.error("合并 %s 与 %s 失败: %s", docx.name, pdf_file.name, e)
+                    logger.error("合并%s与%s失败: %s", docx.name, pdf_file.name, e)
 
         if appended_count > 0:
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -308,6 +314,9 @@ def merge_docx_pdf(cfg_dict: dict, output_path: Path):
 
 # ---------- 工具：mm → pt ----------
 def mm_to_pt(mm: float) -> float:
+    """
+    毫米转磅（PostScript Points）
+    """
     return mm * 72.0 / 25.4
 
 
@@ -453,12 +462,12 @@ def reprint_to_a4(
 # ---------- 脚本入口 ----------
 if __name__ == "__main__":
     # 选择配置（示例开关）
-    is_B24 = "Yes"
-    is_B25B26 = "No"
+    IS_B24 = "Yes"
+    IS_B25B26 = "No"
 
-    if is_B24 == "Yes":
+    if IS_B24 == "Yes":
         config = read_config("./path_config_B24.yaml")
-    elif is_B25B26 == "Yes":
+    elif IS_B25B26 == "Yes":
         config = read_config("./path_config_B25B26.yaml")
     else:
         config = read_config("./path_config.yaml")
