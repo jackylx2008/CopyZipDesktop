@@ -48,7 +48,7 @@ try:
 except ImportError:
     # 设置默认值并标记为 Any 以消除“未绑定”警告
     rl_canvas: Any = None
-    A4: Any = None
+    A4: Any = None  # type: ignore
     _HAS_REPORTLAB = False
 
 try:
