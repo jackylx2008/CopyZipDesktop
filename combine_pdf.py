@@ -17,6 +17,7 @@ import sys
 import tempfile
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import Any  # 新增
 
 import yaml
 from PyPDF2 import PdfMerger
@@ -27,23 +28,27 @@ try:
     import win32com.client
     import pythoncom
     import win32api  # 用于验证安装
+    import pywintypes
 
     # 验证 pywin32 是否正确安装
     _HAS_PYWIN32 = win32api.GetSystemMetrics(0) > 0  # 简单的验证调用
     if _HAS_PYWIN32:
-        COM_ERROR = win32com.client.pywintypes.com_error
+        COM_ERROR = pywintypes.com_error
 except ImportError:
+    win32com = None
     pythoncom = None
     COM_ERROR = Exception
 
 # ========== 可选依赖：reprint_to_a4 使用 ==========
-# 我们在函数里会再次做兜底检查并给出清晰错误
 try:
     from reportlab.pdfgen import canvas as rl_canvas
     from reportlab.lib.pagesizes import A4
 
     _HAS_REPORTLAB = True
 except ImportError:
+    # 设置默认值并标记为 Any 以消除“未绑定”警告
+    rl_canvas: Any = None
+    A4: Any = None
     _HAS_REPORTLAB = False
 
 try:
@@ -53,15 +58,19 @@ try:
 
     _HAS_PDFRW = True
 except ImportError:
-    _HAS_PDFRW = False
+    # 设置默认值并标记为 Any
+    PdfrwReader: Any = None
+    pagexobj: Any = None
+    makerl: Any = None
 
 
 # ---------- 基础设置 ----------
 if sys.platform.startswith("win"):
     # 避免中文日志乱码（需 Python 3.7+）
     try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except (AttributeError, UnicodeError):
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    except Exception:
         pass
 
 # 如需引用上级目录模块，可打开
@@ -212,9 +221,12 @@ def convert_docx_to_pdf(docx_path: Path, output_pdf_path: Path):
     doc = None
     try:
         # 初始化 COM 安全级别
-        pythoncom.CoInitialize()
+        if pythoncom is not None:
+            pythoncom.CoInitialize()
         # 创建 Word 应用实例
         try:
+            if win32com is None or not hasattr(win32com, "client"):
+                raise RuntimeError("win32com 未正确导入，请检查 pywin32 是否安装。")
             word = win32com.client.DispatchEx("Word.Application")
         except Exception as e:
             raise RuntimeError(
@@ -240,7 +252,8 @@ def convert_docx_to_pdf(docx_path: Path, output_pdf_path: Path):
         except (AttributeError, COM_ERROR):
             pass
         # 清理 COM
-        pythoncom.CoUninitialize()
+        if pythoncom is not None:
+            pythoncom.CoUninitialize()
 
 
 # ---------- 合并 DOCX-PDF 对 ----------
@@ -358,6 +371,10 @@ def reprint_to_a4(
     if not _HAS_PDFRW:
         raise RuntimeError("缺少 pdfrw，请先安装：pip install pdfrw")
 
+    # 确保 reportlab 已导入
+    if not _HAS_REPORTLAB:
+        raise RuntimeError("无法导入 reportlab.lib.pagesizes.A4，请检查 reportlab 安装")
+
     # 兼容旧参数名
     if auto_rotate_landscape is not None:
         rotate_landscape_to_portrait = auto_rotate_landscape
@@ -373,9 +390,13 @@ def reprint_to_a4(
     content_w = max(1.0, a4_w - 2 * margin_pt)
     content_h = max(1.0, a4_h - 2 * margin_pt)
 
+    # 确保 PdfrwReader 已定义
     reader = PdfrwReader(str(input_pdf))
-    pages = reader.pages or []
+
+    # 修复：显式转换为 list 解决 Pylance 对 len() 和 enumerate() 的报错
+    pages = list(reader.pages) if reader.pages is not None else []
     total = len(pages)
+
     logger_local.info(
         "开始重新排版到竖向 A4: %s → %s，总页数 %d，边距 %.1f mm，横向页旋转: %s，仅缩小: %s",
         input_pdf,
