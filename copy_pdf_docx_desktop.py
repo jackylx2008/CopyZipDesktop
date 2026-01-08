@@ -118,7 +118,7 @@ def copy_files(
     """
     directories = config.get(file_type, [])
     # 匹配模式: contains|startswith|regex
-    match_mode = config.get("match_mode", "contains")
+    match_mode = config.get("match_mode", "startswith")
 
     if not desktop_output:
         logger.error("配置文件中未指定目标目录 (desktop_output)！")

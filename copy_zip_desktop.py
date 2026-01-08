@@ -57,12 +57,17 @@ def read_config(config_path="./path_config.yaml"):
         return loaded_config
 
 
-def find_matching_directories(root_paths, keywords):
+def find_matching_directories(root_paths, keywords, match_mode="startswith"):
     """
     在多个根目录下查找所有包含关键词的最上级目录，避免收集子目录
     """
     matching_dirs = set()  # 使用集合避免重复
-    logger.info("开始在目录 %s 中查找包含关键词: %s 的目录", root_paths, keywords)
+    logger.info(
+        "开始在目录 %s 中查找包含关键词: %s 的目录 (模式: %s)",
+        root_paths,
+        keywords,
+        match_mode,
+    )
 
     for root_path in root_paths:
         for keyword in keywords:
@@ -70,7 +75,16 @@ def find_matching_directories(root_paths, keywords):
                 if path.is_dir():
                     # 获取路径的最后一个部分
                     last_part = path.parts[-1]
-                    if keyword in last_part:
+
+                    is_match = False
+                    if match_mode == "contains":
+                        if keyword in last_part:
+                            is_match = True
+                    elif match_mode == "startswith":
+                        if last_part.startswith(keyword):
+                            is_match = True
+
+                    if is_match:
                         matching_dir = str(path.resolve())
                         # 检查是否已经包含了这个目录的任何父目录
                         if not any(
@@ -130,13 +144,16 @@ def main():
         keywords = read_keyword()  # 获取多个关键词
         base_directories = app_config["base_directories"]  # 读取多个目录
         desktop_output = app_config["desktop_output"]
+        match_mode = app_config.get("match_mode", "startswith")  # 默认使用 startswith
 
         # 确保输出目录存在
         os.makedirs(desktop_output, exist_ok=True)
         logger.info("确保输出目录存在: %s", desktop_output)
 
         # 在多个目录中查找包含任何一个关键词的所有最上级目录
-        matching_dirs = find_matching_directories(base_directories, keywords)
+        matching_dirs = find_matching_directories(
+            base_directories, keywords, match_mode
+        )
 
         if matching_dirs:
             # 对所有找到的最上级目录进行压缩

@@ -1,3 +1,4 @@
+from logging_config import setup_logger  # 引入日志配置函数
 import logging
 import os
 import shutil
@@ -8,7 +9,6 @@ import yaml
 # 动态添加项目根目录到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from logging_config import setup_logger  # 引入日志配置函数
 
 # 初始化日志记录器
 logger = setup_logger(
@@ -36,7 +36,7 @@ def read_input_txt(input_txt_path):
     return keywords
 
 
-def find_and_copy_docx(keywords, docx_dirs, output_dir):
+def find_and_copy_docx(keywords, docx_dirs, output_dir, match_mode="startswith"):
     """遍历 docx_dirs，找到包含关键字的 docx 文件，并拷贝到 output_dir"""
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -54,7 +54,15 @@ def find_and_copy_docx(keywords, docx_dirs, output_dir):
             for file in files:
                 if file.endswith(".docx"):
                     for keyword in keywords:
-                        if keyword in file:
+                        is_match = False
+                        if match_mode == "contains":
+                            if keyword in file:
+                                is_match = True
+                        elif match_mode == "startswith":
+                            if file.startswith(keyword):
+                                is_match = True
+
+                        if is_match:
                             src_path = os.path.join(root, file)
                             dest_path = os.path.join(output_dir, file)
                             shutil.copy2(src_path, dest_path)
@@ -62,6 +70,7 @@ def find_and_copy_docx(keywords, docx_dirs, output_dir):
                             copied_files += 1
                             if keyword in unmatched_keywords:
                                 unmatched_keywords.remove(keyword)
+                            break  # 找到一个匹配就处理下一个文件
 
     if unmatched_keywords:
         logger.warning(f"未匹配到的关键字: {', '.join(unmatched_keywords)}")
@@ -86,7 +95,8 @@ def main():
         logger.warning("输入文件中没有关键字")
         return
 
-    find_and_copy_docx(keywords, docx_dirs, desktop_output)
+    match_mode = config.get("match_mode", "startswith")
+    find_and_copy_docx(keywords, docx_dirs, desktop_output, match_mode)
 
 
 if __name__ == "__main__":
