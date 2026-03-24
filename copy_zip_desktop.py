@@ -141,7 +141,8 @@ def main():
             )
         )
 
-        keywords = read_keyword()  # 获取多个关键词
+        input_txt = app_config.get("input_txt", "./filename.txt")
+        keywords = read_keyword(input_txt)  # 获取多个关键词
         base_directories = app_config["base_directories"]  # 读取多个目录
         desktop_output = app_config["desktop_output"]
         match_mode = app_config.get("match_mode", "startswith")  # 默认使用 startswith
