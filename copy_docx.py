@@ -1,3 +1,13 @@
+"""
+自动拷贝 DOCX 文件工具。
+
+该脚本用于从配置文件读取 DOCX 源目录、目标目录和关键字清单，
+按照文件名匹配规则递归查找符合条件的 DOCX 文件，并复制到目标目录。
+
+用法示例：
+    python copy_docx.py
+"""
+
 from logging_config import setup_logger  # 引入日志配置函数
 import logging
 import os

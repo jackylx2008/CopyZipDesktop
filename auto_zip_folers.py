@@ -1,3 +1,13 @@
+"""
+批量压缩子目录工具。
+
+该脚本用于读取配置中的基础目录列表，遍历每个基础目录下的直接子目录，
+先将每个子目录分别压缩成独立 ZIP，再把这些 ZIP 二次打包为一个总 ZIP 文件。
+
+用法示例：
+    python auto_zip_folers.py
+"""
+
 import logging
 import os
 import sys
@@ -8,16 +18,15 @@ from pathlib import Path
 import yaml
 
 if sys.platform.startswith("win"):
-    sys.stdout.reconfigure(encoding="utf-8")
-# 动态添加项目根目录到 sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import win32com.client
-from logging_config import setup_logger  # 引入日志配置函数
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if callable(reconfigure):
+        reconfigure(encoding="utf-8")
 
 
 # 初始化日志记录器
-def setup_logger(log_level=logging.INFO, log_file=None):
+def setup_logger(
+    log_level: int = logging.INFO, log_file: str | None = None
+) -> logging.Logger:
     logger = logging.getLogger()
     logger.setLevel(log_level)
     logger.handlers.clear()  # 清除旧的 handler，防止重复输出
